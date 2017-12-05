@@ -1,0 +1,111 @@
+---
+title: "Visualizations by department and isle"
+author: "Pei Gong"
+date: "December 2, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+```{r}
+orders <- read.csv("orders.csv")
+products_prior <- read.csv("order_products__prior.csv")
+order_products_train <- read.csv("order_products__train.csv")
+products <- read.csv("products.csv")
+aisles <- read.csv("aisles.csv")
+departments <- read.csv("departments.csv")
+names(aisles)
+names(products)
+```
+
+#Making division based visualizations
+
+Most ordered product by departments
+```{r}
+#Here, we join the orders by time with the products ordered for prior and train set orders
+prior <- products_prior %>% left_join(orders, by = "order_id")
+
+train <- order_products_train %>% left_join(orders, by = "order_id")
+#Joining the prior and training sets together
+orders_full <- rbind(train, prior) 
+#Counting how many of each product is ordered in each hour 
+orders_1<-orders_full %>% left_join(products, "product_id") 
+
+by_department_summary <- orders_1 %>% group_by(department_id, product_name) %>%
+  summarise(count = n())
+#Finding the most ordered product per hour and joining with product names
+by_department_max <- by_department_summary %>% group_by(department_id) %>% filter(count == max(count)) %>%  left_join(departments, "department_id")
+#Graphing results 
+ggplot(data=by_department_max, aes(x=count, y=department, fill=product_name)) +
+    geom_bar(stat="identity") + xlab("department") + ylab("Count") + 
+  ggtitle("Most Ordered Product per department") 
+#+ guides(fill=guide_legend(title="Product"))
+```
+
+Most ordered product by aisle
+```{r}
+names(orders_1)
+#Counting how many of each product is ordered each day (notice use 
+# of orders_full made above)
+by_aisle_summary <- orders_1 %>% group_by(aisle_id, product_name) %>%
+  summarise(count = n())
+#Finding the most ordered product per hour and joining with product names
+by_aisle_max <- by_aisle_summary %>% group_by(aisle_id) %>% filter(count == max(count)) %>% left_join(aisles, "aisle_id")
+#Graphing results
+ggplot(data=by_aisle_max, aes(x=aisle, y=count, fill=product_name)) +
+    geom_bar(stat="identity") + xlab("Day of Week") + ylab("Count") + 
+  ggtitle("Most Ordered Product Per Day") + guides(fill=guide_legend(title="Product"))
+```
+
+Most ordered by hour by day
+```{r}
+#Counting how many of each product is ordered each day by hour (notice use of 
+# orders_full made above)
+by_day_by_hour_summary <- orders_full %>% 
+  group_by(order_dow, order_hour_of_day, product_id) %>% 
+  summarise(count = n())
+#Finding the most ordered product each hour grouped by day
+by_day_by_hour_max <- by_day_by_hour_summary %>% 
+  group_by(order_dow, order_hour_of_day) %>% filter(count == max(count)) %>%
+  left_join(products, "product_id")
+#Didn't graph because it's still all bananas
+```
+
+#Making frequency based visualizations
+
+50 most ordered products period
+```{r}
+#Tallying product orders
+most_ordered <- orders_full %>% group_by(product_id) %>% summarise(count = n()) 
+#Arranging by count
+most_ordered <- most_ordered %>% arrange(count) 
+#Subsetting the top 50 most frequently ordered products
+most_ordered <- most_ordered %>% top_n(50)
+#Joining with product names
+most_ordered <- most_ordered %>% left_join(products, "product_id") 
+most_ordered <- most_ordered %>% left_join(departments, "department_id")
+#Graphing results
+ggplot(data=most_ordered, aes(x=reorder(product_name, -count), y=count, fill = department)) + geom_bar(stat="identity") + coord_flip() + xlab("Count") + ylab("Product") + 
+  ggtitle("Fifty Most Ordered Products") + guides(fill=guide_legend(title = "Department"))+ scale_fill_brewer(palette="YlGn")
+```
+
+Most re-ordered products
+```{r}
+#Tallying product orders
+most_reordered <- orders_full %>% filter(reordered == 1) %>% group_by(product_id) %>% summarise(count = n()) 
+#Arranging by count
+most_reordered <- most_reordered %>% arrange(count) 
+#Subsetting the top 50 most frequently ordered products
+most_reordered <- most_reordered %>% top_n(50)
+#Joining with product names
+most_reordered <- most_reordered %>% left_join(products, "product_id") 
+most_reordered <- most_reordered %>% left_join(departments, "department_id")
+#Graphing results
+ggplot(data=most_reordered, aes(x=reorder(product_name, -count), y=count, fill = department)) + geom_bar(stat="identity") + coord_flip() + xlab("Count") + ylab("Product") + 
+  ggtitle("Fifty Most ReOrdered Products") + guides(fill=guide_legend(title = "Department"))+ scale_fill_brewer(palette="YlGn")
+```
+
